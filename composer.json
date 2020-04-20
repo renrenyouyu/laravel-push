@@ -1,0 +1,25 @@
+{
+    "name": "renrenyouyu/laravel-push",
+    "description": "laravel 小米推送、魅族、华为推送、vivo、oppo、苹果推送。",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "人人有余",
+            "email": "1134795474@qq.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "illuminate/support": "^5.1 || ^6.0",
+        "predis/predis": "^1.1",
+        "guzzlehttp/guzzle": "^6.2",
+        "php": ">=5.6",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Renrenyouyu\\LaravelPush\\": "src/"
+        }
+    }
+}
