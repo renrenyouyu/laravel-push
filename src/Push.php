@@ -39,12 +39,14 @@ class Push implements DoNewsPusher
             case 'vivo':
                 $service = "VivoPush";
                 break;
+            case 'oppo':
+                $service = "OppoPush";
+                break;
             case 'meizu':
                 $service = "MeizuPush";
                 break;
             default:
-                throw new PushException("platform 参数错误", 405);
-                return null;
+                throw new PushException(405, "platform 参数错误");
                 break;
         }
 
@@ -54,19 +56,16 @@ class Push implements DoNewsPusher
     /**
      * 统一推送接口。
      *
-     * @param
-     *            $deviceToken
-     * @param
-     *            $title
-     * @param
-     *            $message
-     * @param string $platform
-     *            平台名称apple mi huawei umeng vivo meizu
-     * @param string $after_open
-     *            go_custom/go_app/go_url
+     * @param string $platform 平台名称 apple mi huawei oppo vivo umeng meizu
+     * @param string $title 标题
+     * @param string $content 内容
+     * @param string $type 发送类型 1:all 2:regId 3:alias 4:topic 5:tag
+     * @param array $id    目标id regId/alias/tag
+     * @param array $extrasData 扩展数据
      * @return mixed
+     * @throws PushException
      */
-    public function send($deviceToken, $title, $message, $platform, $type, $after_open, $customize)
+    public function send($platform, $title, $content, $type, $id = null, $extrasData = null)
     {
         $platform=strtolower($platform);
         // 得到相关的类名称
@@ -81,62 +80,10 @@ class Push implements DoNewsPusher
          * @var \Renrenyouyu\LaravelPush\Services\BasePush $push
          */
         $push = new $service($config);
-        $push->setPkgName($this->config["pkgname"]);
-        if (! is_array($after_open)) {
-            // 也许存在多个参数
-            $after_open = [
-                $after_open,
-            ];
-        }
-        return $push->sendMessage($deviceToken, $title, $message, $type, $after_open, $customize);
+        $push->setPkgName($this->config["pkgName"]);
+
+        return $push->sendMessage($title, $content, $type, $id, $extrasData);
     }
 
-    /**
-     * 根据用户ID设置用户token
-     * @param $platform
-     * @param $app_id
-     * @param $user_id
-     * @param $deviceToken
-     * @return bool
-     */
-    public function setToken($platform, $app_id, $user_id, $deviceToken)
-    {
-        if (!$app_id || !$user_id || !$deviceToken || !$platform) {
-            return false;
-        }
-        $this->redis->set($app_id . ":" . $user_id . ":regid:", $platform .":". $deviceToken);
-        return true;
-    }
-
-
-    /**
-     * 根据用户ID获取用户token
-     */
-    public function getToken($app_id, $user_id)
-    {
-        return $this->redis->get($app_id . ":" . $user_id . ":regid:");
-    }
-
-    /**
-     * 根据用户ID设置用户token
-     */
-    public function setDeviceToken($app_id, $list_name, $platform, $deviceToken)
-    {
-        return $this->redis->lpush($app_id.$list_name, $platform.':'.$deviceToken);
-    }
-
-    /**
-     * 根据用户ID设置用户token
-     */
-    public function getDeviceToken($app_id, $list_name, $page = 1, $pageSize = 100)
-    {
-        return $this->redis->lrange($app_id.$list_name, ($page-1)*$pageSize ,$pageSize);
-    }
-
-    //返回列表长度
-    public function getListLen($app_id, $list_name)
-    {
-        return $this->redis->llen($app_id.$list_name);
-    }
 
 }

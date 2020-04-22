@@ -1,5 +1,5 @@
 <?php
-namespace Renrenyouyu\LaravelPush\MzPushSDk;
+namespace Renrenyouyu\LaravelPush\Sdk\Meizu;
 
 
 /**

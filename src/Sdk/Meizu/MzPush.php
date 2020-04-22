@@ -6,7 +6,7 @@
  * Date: 2016/8/25
  * Time: 10:44
  */
-namespace Renrenyouyu\LaravelPush\MzPushSDk;
+namespace Renrenyouyu\LaravelPush\Sdk\Meizu;
 
 
 //===========错误码=============

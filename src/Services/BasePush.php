@@ -38,13 +38,6 @@ class BasePush implements PushInterface
     var $intentUri;
 
     /**
-     * 开发环境sandbox/production
-     *
-     * @var unknown
-     */
-    var $appEnvironment;
-
-    /**
      * 授权获得accesstoken的地址
      *
      * @var string
@@ -65,17 +58,6 @@ class BasePush implements PushInterface
      */
     var $_sendUrl;
 
-    /**
-     * 不同的发送消息类型
-     *
-     * @var string
-     */
-    var $httpSendType;
-
-    var $result;
-
-    var $customize;
-
     protected $_redisConfig = [
         'database' => 0,
         'duration' => 3600,
@@ -83,7 +65,7 @@ class BasePush implements PushInterface
         'password' => false,
         'persistent' => true,
         'port' => 6379,
-        'prefix' => 'push_',
+        'prefix' => 'push:',
         'probability' => 100,
         'host' => '127.0.0.1',
         'timeout' => 0,
@@ -113,7 +95,7 @@ class BasePush implements PushInterface
      *
      * @see \Renrenyouyu\LaravelPush\Contracts\PushInterface::sendMessage()
      */
-    public function sendMessage ($deviceToken, $title, $message, $type, $after_open, $customize)
+    public function sendMessage ($title, $content, $type, $id = null, $extrasData = null)
     {
         // TODO Auto-generated method stub
     }
@@ -177,30 +159,6 @@ class BasePush implements PushInterface
     }
 
     /**
-     *
-     * {@inheritdoc}
-     *
-     * @see \Renrenyouyu\LaravelPush\Contracts\PushInterface::getSendType()
-     */
-    public function getSendType ($type)
-    {
-        // TODO Auto-generated method stub
-        return 1;
-    }
-
-    /**
-     *
-     * {@inheritdoc}
-     *
-     * @see \Renrenyouyu\LaravelPush\Contracts\PushInterface::getAfterOpen()
-     */
-    public function getAfterOpen ($go_after)
-    {
-        // TODO Auto-generated method stub
-        return [];
-    }
-
-    /**
      * 连接redis缓存
      *
      * @return boolean
@@ -241,19 +199,9 @@ class BasePush implements PushInterface
     public function getCacheKey ($key)
     {
         if (!empty($this->_redisConfig["prefix"])) {
-            return $this->_redisConfig["prefix"] . $key;
+            return $this->_redisConfig["prefix"]. $key;
         }
         return $key;
-    }
-
-    /**
-     * 根据发送类型，返回对应的字段
-     *
-     * @param string $deviceToken
-     */
-    public function getHttpSendType ($deviceToken)
-    {
-        return [];
     }
 
     public function setPkgName ($name)
@@ -264,11 +212,6 @@ class BasePush implements PushInterface
     public function getPkgName ()
     {
         return $this->pkgName;
-    }
-
-    public function getResult ()
-    {
-        return $this->result;
     }
 
     /**

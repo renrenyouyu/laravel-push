@@ -4,25 +4,15 @@ namespace Renrenyouyu\LaravelPush\Contracts;
 
 interface PushInterface
 {
-    public function sendMessage($deviceToken, $title, $message, $type, $id, $customize);
-
     /**
-     * 传送类型：
-     * 消息：message/透传：quiet
-     *
-     * @param unknown $type
+     * Notes:
+     * @param string $title 标题
+     * @param string $content 内容
+     * @param string $type 发送类型 1:all 2:regId 3:alias 4:tag
+     * @param array $id    目标id regId/alias/tag
+     * @param array $extrasData 扩展数据
+     * @return mixed
      */
-    public function getSendType($type);
-
-    /**
-     * 点击之后的打开行为
-     *
-     * @param string|[] $go_after
-     *            go_app:打开app首页;
-     *            go_custom:app自定义操作;
-     *            go_url:打开url;
-     *            go_page:打开指定界面,app需要提前定义
-     */
-    public function getAfterOpen($go_after);
+    public function sendMessage($title, $content, $type, $id = null, $extrasData = null);
 
 }

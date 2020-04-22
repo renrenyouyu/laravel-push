@@ -2,17 +2,14 @@
 
 namespace Renrenyouyu\LaravelPush\Services;
 
-use Singiu\Http\Request;
+use Renrenyouyu\LaravelPush\Exceptions\PushException;
+use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Builder;
+use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Constants;
+use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Region;
+use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Sender;
 
-
-class MiPush
+class MiPush extends BasePush
 {
-    private $_appPackageName;
-    private $_appSecret;
-    private $_request;
-    private $_url = 'https://api.xmpush.xiaomi.com/v3/message/regid';
-    private $_intent_uri;
-
 
     /**
      * MiPush constructor.
@@ -20,61 +17,60 @@ class MiPush
      * @param null $config
      * @throws \Exception
      */
-    public function __construct($config = null)
+    public function __construct ($config = null)
     {
-        if (!empty(config('push.platform.mi.app_package_name'))) {
-            $this->_appPackageName = config('push.platform.mi.app_package_name');
-        } else {
-            throw new \Exception('Cannot found configuration: mi.app_package_name!');
-        }
-
-        if (!empty(config('push.platform.mi.app_secret'))) {
-            $this->_appSecret = config('push.platform.mi.app_secret');
-        } else {
-            throw new \Exception('Cannot found configuration: mi.app_secret!');
-        }
-
-        // if (!empty(config('push.platform.mi.intent_uri'))) {
-        //     $this->_appSecret = config('push.platform.mi.intent_uri');
-        // } else {
-        //     throw new \Exception('Cannot found configuration: mi.intent_uri!');
-        // }
-
-        $this->_request = new Request();
+        parent::__construct($config);
     }
 
     /**
      * 发送推送通知。
      *
-     * @param $deviceToken
-     * @param $title
-     * @param $message
-     * @return \Singiu\Http\Response
-     * @throws \Exception
+     * @param string $title 标题
+     * @param string $content 内容
+     * @param string $type 发送类型 1:all 2:regId 3:alias 4:topic 5:tag
+     * @param array $id 目标id regId/alias/tag
+     * @param array $extrasData 扩展数据
+     * @return mixed
+     * @throws PushException
+     * @see \Renrenyouyu\LaravelPush\Contracts\PushInterface::sendMessage()
      */
-    public function sendMessage($deviceToken, $title, $message, $type = null, $id = null)
+    public function sendMessage ($title, $content, $type, $id = null, $extrasData = null)
     {
-        $payload = [
-            'title' => $title, // 通知栏展示的通知的标题，这里统一不显示。
-            'description' => $message,
-            'pass_through' => 0, // 设定是否为透传消息，0 = 推送消息，1 = 透传消息。
-            'payload' => $message, // 消息内容。
-            'notify_type' => -1, // 提示通知默认设定，-1 = DEFAULT_ALL。
-            'extra.notify_effect' => 2, // 预定义通知栏消息的点击行为，1 = 打开 app 的 Launcher Activity，2 = 打开 app 的任一 Activity（还需要 extra.intent_uri）,3 = 打开网页（还需要传入 extra.web_uri）
-            'extra.intent_uri' => 'intent:#Intent;component=com.wanmei.a9vg/.common.activitys.NotifyActivity;end',
-            'restricted_package_name' => 'com.wanmei.a9vg',
-            'registration_id' => $deviceToken,
-            'extra.type' => $type,
-            'extra.id' => $id,
-        ];
+        Constants::setPackage($this->pkgName);
+        Constants::setSecret($this->appSecret);
 
-        $response = $this->_request->post($this->_url, [
-            'headers' => [
-                'Authorization' => 'key=' . $this->_appSecret
-            ],
-            'data' => $payload
-        ]);
+        $sender = new Sender();
+        $sender->setRegion(Region::China);// 支持海外
 
-        return $response;
+        // message自定义的点击行为
+        $message = new Builder();
+        $message->title($title);  // 通知栏的title
+        $message->description($content); // 通知栏的descption
+        $message->passThrough(0);  // 这是一条通知栏消息，如果需要透传，把这个参数设置成1,同时去掉title和descption两个参数
+        $message->payload(json_encode($extrasData['extras'] ?? $extrasData)); // 携带的数据，点击后将会通过客户端的receiver中的onReceiveMessage方法传入。
+        $message->extra(Builder::notifyForeground, 1); // 应用在前台是否展示通知，如果不希望应用在前台时候弹出通知，则设置这个参数为0
+        $message->notifyId(2); // 通知类型。最多支持0-4 5个取值范围，同样的类型的通知会互相覆盖，不同类型可以在通知栏并存`
+        $message->build();
+
+        //发送目标
+        switch ($type){
+            case 1:
+                $sender = $sender->broadcastAll($message);
+                break;
+            case 2:
+                $sender = $sender->sendToIds($message, $id);
+                break;
+            case 3:
+                $sender = $sender->sendToAliases($message, $id);
+                break;
+            case 4:
+                $sender = $sender->broadcast($message, $id);
+                break;
+            default:
+                throw new PushException(400, 'miPush no exist type='. $type);
+        }
+
+        $result = $sender->getRaw();
+        return $result;
     }
 }

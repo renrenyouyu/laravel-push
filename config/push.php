@@ -12,9 +12,9 @@ return [
             'database' => env('REDIS_DATABASE', 0),
         ]
     ],
-    "pkgname" => env("APP_PKG_NAME", ""),
+    "pkgName" => env("APP_PKG_NAME", ""),
     "platform" => [
-        "xiaomi" => [
+        "mi" => [
             "appSecret" => env("XIAOMI_APP_SECRET", null),
             "intentUri" => env("XIAOMI_APP_INTENT_URI", null),
             "httpSendType" => env("XIAOMI_APP_SEND_TYPE", "alias")
