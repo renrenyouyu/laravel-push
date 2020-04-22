@@ -9,7 +9,7 @@
             "email": "1134795474@qq.com"
         }
     ],
-    "version": "1.0",
+    "version": "1.0.1",
     "minimum-stability": "dev",
     "require": {
         "illuminate/support": "^5.1 || ^6.0",
