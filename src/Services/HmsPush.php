@@ -79,7 +79,7 @@ class HmsPush extends BasePush
         ];
         $data['android'] = [
             'collapse_key' => -1,
-            'data' => '',
+            'data' => json_encode($extrasData),
             'notification' => [
                 'title' => $title,
                 'body' => $content,
