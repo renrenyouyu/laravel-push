@@ -2,6 +2,7 @@
 
 namespace Renrenyouyu\LaravelPush\Services;
 
+use Renrenyouyu\LaravelPush\Exceptions\APIRequestException;
 use Renrenyouyu\LaravelPush\Exceptions\PushException;
 use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Builder;
 use Renrenyouyu\LaravelPush\Sdk\Xiaomi\Constants;
@@ -71,6 +72,9 @@ class MiPush extends BasePush
         }
 
         $result = $sender->getRaw();
+        if (!isset($result["code"]) || $result["code"] != 0) {
+            throw new APIRequestException($result["code"], 'msg='. $result["reason"]. ' result=' . json_encode($result, JSON_UNESCAPED_UNICODE));
+        }
         return $result;
     }
 }
