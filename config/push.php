@@ -37,6 +37,7 @@ return [
             "appKey" => env("VIVO_APP_KEY", null),
             "appSecret" => env("VIVO_APP_SECRET", null),
             "httpSendType" => env("VIVO_APP_SEND_TYPE", "alias"),
+            "intentUri" => env("VIVO_APP_INTENT_URI", null),
         ],
 
         "oppo" => [

@@ -102,6 +102,7 @@ class BasePush implements PushInterface
 
     var $_httpHeaderContentType = array('Content-Type: application/x-www-form-urlencoded');
 
+    var $_httpType = 'form';
 
     /**
      * 请求新的 Access Token。
@@ -119,7 +120,11 @@ class BasePush implements PushInterface
         if (!$accessToken || $refresh) {
             $data = $this->getAuthData();
             // 有很大几率会调用失败
-            $result = $this->post($this->_authUrl, $data, $this->_httpHeaderContentType);
+            if($this->_httpType=='json'){
+                $result = $this->postJson($this->_authUrl, $data, $this->_httpHeaderContentType);
+            }else{
+                $result = $this->post($this->_authUrl, $data, $this->_httpHeaderContentType);
+            }
 
             $accessToken = $this->getResponseToken($result);
             if (empty($accessToken)) {
@@ -225,6 +230,15 @@ class BasePush implements PushInterface
         return (float)sprintf('%.0f', (floatval($msec) + floatval($sec)) * 1000);
     }
 
+    /**
+     * 获取requestId
+     *
+     * @return number
+     */
+    protected function getRequestId ()
+    {
+        return (int) ($this->getTime(). rand(1000, 9999));
+    }
     /**
      * @param $url
      * @param array $params

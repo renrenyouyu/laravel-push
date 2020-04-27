@@ -33,55 +33,11 @@ class OppoPush extends BasePush
      * @param array $config
      * @throws \Exception
      */
-    public function __construct($config = null)
+    public function __construct ($config = null)
     {
         parent::__construct($config);
         // 连接redis服务器，用来存储accessToken
         $this->getRedisConnection();
-    }
-
-    /**
-     * 请求新的 Access Token。
-     *
-     * @param int $tryCount
-     *            可重试次数
-     * @param bool $refresh
-     * @return string
-     * @throws \Exception
-     */
-    public function getAccessToken ($tryCount = 1, $refresh = false)
-    {
-        $key = $this->getCacheKey($this->_authCacheKey);
-        $accessToken = $this->_redis->get($key);
-        if (!$accessToken || $refresh) {
-            $this->_getTime();
-    		$sign = hash('sha256',$this->appKey.$this->_time.$this->masterSecret);
-
-	    	$data['app_key'] = $this->appKey;
-			$data['timestamp'] = $this->_time;
-			$data['sign'] = $sign;
-
-			$res = $this->post($this->_authUrl, $data, null);
-            $accessToken = $res['data']['auth_token'] ?? null;
-            if (empty($accessToken)) {
-                // 获取token失效
-                if ($tryCount < 1) {
-                    throw new \Exception("获取token失败");
-                }
-                // 过一会儿重试
-                sleep(1);
-                return $this->getAccessToken($tryCount - 1, $refresh);
-            }
-            // 设置的缓存小于实际100秒，有利于掌控有效期,默认缓存半小时,每天获取的机会还是很多的
-            $this->_redis->setex($key, 1800, $accessToken);
-        }
-        return $accessToken;
-    }
-
-    private function _getTime()
-    {
-    	list($msec, $sec) = explode(' ', microtime());
-		$this->_time = (float)sprintf('%.0f', (floatval($msec) + floatval($sec)) * 1000);
     }
 
     /**
@@ -95,26 +51,26 @@ class OppoPush extends BasePush
      * @return mixed
      * @throws \Exception
      */
-    public function sendMessage($title, $content, $type, $id = null, $extrasData = null)
+    public function sendMessage ($title, $content, $type, $id = null, $extrasData = null)
     {
-        $accessToken = $this->getAccessToken();
+        $accessToken = $this->getAccessToken(1, true);
 
         $notification['title'] = $title;
-		$notification['content'] = $content;
-		$notification['action_parameters'] = json_encode($extrasData);
+        $notification['content'] = $content;
+        $notification['action_parameters'] = json_encode($extrasData);
 
-		$notification['click_action_type'] = 1;
-		$notification['click_action_activity'] = $this->intentUri;
+        $notification['click_action_type'] = 1;
+        $notification['click_action_activity'] = $this->intentUri;
 
-		//先发送消息体内容
-        $save_message_content_url = $this->_sendUrl. 'message/notification/save_message_content';
-        $save_message_content_result = $this->post($save_message_content_url, $notification, array_merge($this->_httpHeaderContentType, ['auth_token'=> $accessToken]));
+        //先发送消息体内容
+        $save_message_content_url = $this->_sendUrl . 'message/notification/save_message_content';
+        $save_message_content_result = $this->post($save_message_content_url, $notification, array_merge($this->_httpHeaderContentType, ['auth_token' => $accessToken]));
 
-        if(!$save_message_content_result){
+        if (!$save_message_content_result) {
             throw new APIRequestException(400, 'oppoPush save_message_content_result empty');
         }
 
-        if($save_message_content_result['code'] != 0){
+        if ($save_message_content_result['code'] != 0) {
             throw new APIRequestException($save_message_content_result['code'], $save_message_content_result['message']);
         }
 
@@ -123,15 +79,15 @@ class OppoPush extends BasePush
         $message = [];
         $message['message_id'] = $message_id;
         //发送目标
-        switch ($type){
+        switch ($type) {
             case 1:
                 $message['target_type'] = 1;
                 break;
             case 2:
             case 3:
                 $message['target_type'] = 2;
-                if(is_array($id)){
-                    if(count($id) > 1000){
+                if (is_array($id)) {
+                    if (count($id) > 1000) {
                         throw new PushException(400, 'oppoPush regId or alias max count 1000');
                     }
                     $id = implode(';', $id);
@@ -143,12 +99,49 @@ class OppoPush extends BasePush
                 $message['target_value'] = $id;
                 break;
             default:
-                throw new PushException(400, 'oppoPush no exist type='. $type);
+                throw new PushException(400, 'oppoPush no exist type=' . $type);
         }
 
-		$endUrl = $this->_sendUrl.'message/notification/broadcast';
+        $endUrl = $this->_sendUrl . 'message/notification/broadcast';
 
-		$result = $this->post($endUrl, $message, array_merge($this->_httpHeaderContentType, ['auth_token'=> $accessToken]));
-		return $result;
+        $result = $this->post($endUrl, $message, array_merge($this->_httpHeaderContentType, ['auth_token' => $accessToken]));
+        return $result;
+    }
+
+    /**
+     *
+     * {@inheritDoc}
+     * @see \Renrenyouyu\LaravelPush\Services\BasePush::getAuthData()
+     */
+    protected function getAuthData ()
+    {
+        if (!$this->appKey || !$this->masterSecret) {
+            throw new PushException(500, 'appKey or masterSecret empty');
+        }
+        $this->_time = $this->getTime();
+        $sign = hash('sha256', $this->appKey . $this->_time . $this->masterSecret);
+
+        $data['app_key'] = $this->appKey;
+        $data['timestamp'] = $this->_time;
+        $data['sign'] = $sign;
+
+        return $data;
+    }
+
+    /**
+     * 获取鉴权之后的token
+     * {@inheritDoc}
+     * @see \Renrenyouyu\LaravelPush\Services\BasePush::getResponseToken()
+     */
+    protected function getResponseToken ($data)
+    {
+        if (!is_array($data)) {
+            $data = json_decode($data, true);
+        }
+
+        if (!isset($data['data']['auth_token'])) {
+            return false;
+        }
+        return $data['data']['auth_token'];
     }
 }

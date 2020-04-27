@@ -1,20 +1,46 @@
 <?php
 
 namespace Renrenyouyu\LaravelPush\Services;
-use Illuminate\Redis\RedisManager as Redis;
 
-class VivoPush
+use Renrenyouyu\LaravelPush\Exceptions\APIRequestException;
+use Renrenyouyu\LaravelPush\Exceptions\PushException;
+
+class VivoPush extends BasePush
 {
-    private $_accessToken;
-    private $_appId;
-    private $_appKey;
-    private $_appSecret;
-    private $_http;
-    private $_sign;
     private $_time;
-    private $_redis;
-    private $_url = "https://api-push.vivo.com.cn";
-	private	$_headers = array("Content-type: application/json;charset='utf-8'");
+
+    /**
+     * 获取token地址
+     *
+     * @var string
+     */
+    var $_authUrl = "https://api-push.vivo.com.cn/message/auth";
+
+    var $_httpHeaderContentType = array('Content-Type: application/json');
+    var $_httpType = 'json';
+
+    /**
+     * 发送推送地址
+     *
+     * @var string
+     */
+    var $_sendUrl = "https://api-push.vivo.com.cn/message/send";
+
+    /**
+     * 广播保存推送消息地址
+     *
+     * @var string
+     */
+    var $_sendSaveMessageUrl = "https://api-push.vivo.com.cn/message/saveListPayload";
+
+    /**
+     * 批量推送消息地址
+     *
+     * @var string
+     */
+    var $_batchSendUrl = "https://api-push.vivo.com.cn/message/pushToList";
+
+    var $_authCacheKey = "vivo_authtoken";
 
     /**
      * 构造函数。
@@ -22,111 +48,132 @@ class VivoPush
      * @param array $config
      * @throws \Exception
      */
-    public function __construct($config = null)
+    public function __construct ($config = null)
     {
-
-        if (!empty(config('push.platform.vivo.appId'))) {
-            $this->_appId = config('push.platform.vivo.appId');
-        } else {
-            throw new \Exception('Cannot found configuration: vivo.appId!');
-        }
-        if (!empty(config('push.platform.vivo.appKey'))) {
-            $this->_appKey = config('push.platform.vivo.appKey');
-        } else {
-            throw new \Exception('Cannot found configuration: vivo.appKey!');
-        }
-        if (!empty(config('push.platform.vivo.appSecret'))) {
-            $this->_appSecret = config('push.platform.vivo.appSecret');
-        } else {
-            throw new \Exception('Cannot found configuration: vivo.appSecret!');
-        }
-        $this->_redis = new Redis(config("push.redis.client"), config("push.redis"));
-
+        parent::__construct($config);
+        // 连接redis服务器，用来存储accessToken
+        $this->getRedisConnection();
     }
-
-    /**
-     * 请求新的 Access Token。
-     */
-    private function _getAccessToken()
-    {
-    	$this->_accessToken = $this->_redis->get("vivo:authToekn:");
-    	if(!$this->_accessToken){
-    		$this->_getTime();
-    		$sign = md5($this->_appId.$this->_appKey.$this->_time.$this->_appSecret);
-
-	    	$data = [
-			    "appId" => $this->_appId,
-			    "appKey" => $this->_appKey,
-			    "timestamp" => $this->_time,
-			    "sign" => $sign,
-			];
-
-			$res = $this->curlPost($this->_url.'/message/auth', json_encode($data), $this->_headers);
-			$res = json_decode($res,1);
-
-			if($res['result'] != '0'){
-				throw new \Exception($res['desc']);
-			}
-			$this->_accessToken = $res['authToken'];
-
-            $this->_redis->setex("vivo:authToekn:",3600,$this->_accessToken);
-    	}
-    }
-
-    private function _getTime()
-    {
-    	list($msec, $sec) = explode(' ', microtime());
-		$this->_time = (float)sprintf('%.0f', (floatval($msec) + floatval($sec)) * 1000);
-    }
-
-    /**
-     * curlPost
-     */
-    private function curlPost($url, $data, $headers)
-	{
-
-	    $ch = curl_init();//初始化curl
-	    curl_setopt($ch, CURLOPT_URL,$url);//抓取指定网页
-	    curl_setopt($ch, CURLOPT_HEADER, 0);//设置header
-	    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);//要求结果为字符串且输出到屏幕上
-	    curl_setopt($ch, CURLOPT_POST, 1);//post提交方式
-	    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-	    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-	    $result = curl_exec($ch);//运行curl
-	    curl_close($ch);
-
-	    return $result;
-	}
 
     /**
      * 发送vivo推送消息。
-     * @param $deviceToken
-     * @param $title
-     * @param $message
-     * @return Response
-     * @throws
+     *
+     * @param string $title 标题
+     * @param string $content 内容
+     * @param string $type 发送类型 1:all 2:regId 3:alias 4:topic 5:tag
+     * @param array $id 目标id regId/alias/tag
+     * @param array $extrasData 扩展数据
+     * @return mixed
+     * @throws \Exception
      */
-    public function sendMessage($deviceToken, $title, $message, $type, $id)
+    public function sendMessage ($title, $content, $type, $id = null, $extrasData = null)
     {
-    	$this->_getAccessToken();
-        $data = [
-		    //用户ID
-		    'regId' => $deviceToken,
-		    "notifyType" => '2',
-		    "title" => $title,
-		    "content" => $message,
-		    "skipType" => "1",
-		    "requestId" => $this->_accessToken,
-		    //自定义参数
-		    "clientCustomMap" => array(
-		        'type'=>$type,
-		        'id' => $id,
-		    ),
-		];
+        if(!$id){
+            throw new PushException(400, 'vivoPush id is empty');
+        }elseif(!is_array($id)){
+            $id = [$id];
+            if (count($id) > 1000) {
+                throw new PushException(400, 'vivoPush regId or alias max count 1000');
+            }
+        }
 
-		$this->_headers[] = "authToken:".$this->_accessToken;
+        $accessToken = $this->getAccessToken();
 
-		$res = $this->curlPost($this->_url.'/message/send', json_encode($data), $this->_headers);
-		return json_decode($res,1);
+        $data = $batchData = [];
+
+        $this->intentUri = $this->intentUri. json_encode($extrasData['extras']);
+
+        $data['notifyType'] = '2';
+        $data['title'] = $title;
+        $data['content'] = $content;
+        $data['skipType'] = '4';
+        //自定义跳转
+        $data['skipContent'] = $this->intentUri;
+        $data['requestId'] = $this->getRequestId();
+
+        if(count($id)>1){
+            //广播先发消息
+            $saveResult = $this->postJson($this->_sendSaveMessageUrl, $data, array_merge($this->_httpHeaderContentType, ['authToken' => $accessToken]));
+            if (!$saveResult) {
+                throw new APIRequestException(400, 'vivoPush save_message_content_result empty');
+            }
+
+            if (!isset($saveResult['result']) || $saveResult['result'] != 0) {
+                throw new APIRequestException($saveResult['code'], $saveResult['message']);
+            }
+
+            $batchData['taskId'] = $saveResult['taskId'];
+        }
+
+        //发送目标 因为所有广播有数量限制 所以只使用单播和批量广播 不使用所有广播
+        switch ($type) {
+            case 2:
+                if(count($id)==1) {
+                    $data['regId'] = $id[0];
+                }else{
+                    $batchData['regIds'] = $id;
+                    $batchData['requestId'] = $this->getRequestId();
+                }
+                break;
+            case 3:
+                if(count($id)==1) {
+                    $data['alias'] = $id[0];
+                }else{
+                    $batchData['aliases'] = $id;
+                    $batchData['requestId'] = $this->getRequestId();
+                }
+                break;
+            default:
+                throw new PushException(400, 'vivoPush no exist type=' . $type);
+        }
+
+        if(count($id)>1){
+            $sendUrl = $this->_batchSendUrl;
+            $message = $batchData;
+        }else{
+            $sendUrl = $this->_sendUrl;
+            $message = $data;
+        }
+
+        $result = $this->postJson($sendUrl, $message, array_merge($this->_httpHeaderContentType, ['authToken' => $accessToken]));
+        return $result;
+    }
+
+    /**
+     *
+     * {@inheritDoc}
+     * @see \Renrenyouyu\LaravelPush\Services\BasePush::getAuthData()
+     */
+    protected function getAuthData ()
+    {
+        if (!$this->appId || !$this->appKey || !$this->appSecret) {
+            throw new PushException(500, 'appId or appKey or appSecret empty');
+        }
+        $this->_time = $this->getTime();
+        $sign = md5($this->appId . $this->appKey . $this->_time . $this->appSecret);
+
+        return [
+            "appId" => $this->appId,
+            "appKey" => $this->appKey,
+            "timestamp" => $this->_time,
+            "sign" => $sign,
+        ];
+    }
+
+    /**
+     * 获取鉴权之后的token
+     * {@inheritDoc}
+     * @see \Renrenyouyu\LaravelPush\Services\BasePush::getResponseToken()
+     */
+    protected function getResponseToken ($data)
+    {
+        if (!is_array($data)) {
+            $data = json_decode($data, true);
+        }
+
+        if (!isset($data['authToken'])) {
+            return false;
+        }
+        return $data['authToken'];
     }
 }
