@@ -100,7 +100,7 @@ class HmsPush extends BasePush
         );
 
         if (!isset($response["code"]) || $response["code"] != '80000000') {
-            throw new APIRequestException($response["code"], 'msg='. $response["msg"]. ' result=' . json_encode($response, JSON_UNESCAPED_UNICODE));
+            throw new APIRequestException($response["code"], $response["msg"]);
         }
         //统一成功code为0
         $response["code"] = $response["code"] == '80000000' ? 0 : $response["code"];
