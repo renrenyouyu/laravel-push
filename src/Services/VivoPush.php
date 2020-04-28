@@ -81,7 +81,7 @@ class VivoPush extends BasePush
 
         $data = $batchData = [];
 
-        $this->intentUri = $this->intentUri. json_encode($extrasData['extras']);
+        $this->intentUri = $this->intentUri. json_encode($extrasData['extras'] ?? $extrasData);
 
         $data['notifyType'] = '2';
         $data['title'] = $title;
