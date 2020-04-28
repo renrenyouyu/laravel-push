@@ -11,14 +11,12 @@ class Push implements DoNewsPusher
 {
 
     protected $config;
-    protected $redis;
     protected $platform;
 
     public function __construct(array $config)
     {
         $this->config =  new Config($config);
         $this->platform = $this->config->get('platform');
-        $this->redis = new Redis(app(), $this->config->get('redis.client'), $this->config->get('redis'));
     }
 
     private function getService($platform)
