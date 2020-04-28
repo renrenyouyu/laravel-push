@@ -136,6 +136,10 @@ class VivoPush extends BasePush
         }
 
         $result = $this->postJson($sendUrl, $message, array_merge($this->_httpHeaderContentType, ['authToken' => $accessToken]));
+
+        if (!isset($result["result"]) || $result["result"] != 0) {
+            throw new APIRequestException($result["result"] ?? -1, $result['desc'] ?? '发生异常');
+        }
         return $result;
     }
 

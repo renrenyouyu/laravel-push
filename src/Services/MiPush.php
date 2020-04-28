@@ -73,7 +73,7 @@ class MiPush extends BasePush
 
         $result = $sender->getRaw();
         if (!isset($result["code"]) || $result["code"] != 0) {
-            throw new APIRequestException($result["code"], 'msg='. $result["reason"]. ' result=' . json_encode($result, JSON_UNESCAPED_UNICODE));
+            throw new APIRequestException($result["code"], json_encode($result, JSON_UNESCAPED_UNICODE));
         }
         return $result;
     }
